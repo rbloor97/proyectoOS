@@ -17,19 +17,21 @@
 #define max_amb 1000 //Número máximo de carateres para las variables de ambiente
 #define clear() printf("\033[H\033[J")
 
+
+/**Variables para conocer el directorio actual de trabajo**/
 char PWD[max_amb];
 char SHELL[max_amb];
 char PATH[max_amb];
 
-/** Funciones declaradas para los comandos del shell**/
+/** Funciones declaradas para los comandos internos del shell, cd, help y exit**/
 int my_cd(char **args);
 int my_help(char **args);
 int my_exit(char **args);
 
 char *commands_list[] = {
-  "cd",
-  "help",
-  "exit"
+  "cd", //comando paa cambiar de directorio
+  "help", //Comando para obtener ayuda sobre el programa
+  "exit" //Salir del programa
 };
 
 int (*commands_func[]) (char **) = {
@@ -45,7 +47,7 @@ int num_commands() { //Número de comando internos
 /** Implementación de los comandos internos**/
 
 /**
-   @brief Comando cd.
+   @función Comando cd.
    @param Argumentos.  args[0] es "cd".  args[1] es el directorio.
    @return retorna 1 y termina la ejecución.
  */
@@ -63,7 +65,7 @@ int my_cd(char **args)
 }
 
 /**
-   @brief Comando help.
+   @descripcion Comando help.
    @param No necesita argumentos.  
    @return retorna 1 y termina la ejecución.
  */
@@ -72,7 +74,7 @@ int my_help(char **args)
 {
   int i;
   printf("\t Renzo Loor Minishell\n");
-  printf("Escribe el nombre del progrema y sus argumentos, y presiona enter.\n");
+  printf("Escribe el nombre del programa y sus argumentos, y presiona enter.\n");
   printf("Los comandos internos son:\n");
 
   for (i = 0; i < num_commands(); i++) {
@@ -84,7 +86,7 @@ int my_help(char **args)
 }
 
 /**
-   @brief Comando exit.
+   @descripcion Comando exit.
    @param No necesita argumentos.
    @return Retorna 0 y termina la ejecución.
  */
@@ -94,7 +96,7 @@ int my_exit(char **args)
 }
 
 /**
-  @brief Lanza un programa y espera a que termine.
+  @descripcion Lanza un programa y espera a que termine.
    @return Retorna 1 para continuar la ejecución.
  */
 int launch(char **args)
@@ -120,7 +122,7 @@ int launch(char **args)
 }
 
 /**
-   @brief ejecuta el minishell o lanza un programa.
+   @descripcion ejecuta el minishell o lanza un programa.
    @return 1 si el minishell continua ejecutándose, 0 si terminó
  */
 int execute(char **args)
@@ -143,60 +145,30 @@ int execute(char **args)
 #define BUFFER_SIZE 1024
 
 /**
-Lee las líneas ingresadas en la entrada estandar.
+Lee las líneas ingresadas en la entrada estandar le asigna un espacio de memoria, si se excede se le reasigna una más grande.
  */
-char *read_line(void)
+char *leer_linea(void)
 {
-  int bufsize = BUFFER_SIZE;
-  int position = 0;
-  char *buffer = malloc(sizeof(char) * bufsize);
-  int c;
-
-  if (!buffer) {
-    fprintf(stderr, "lsh: allocation error\n");
-    exit(EXIT_FAILURE);
-  }
-
-  while (1) {
-    // Read a character
-    c = getchar();
-
-    if (c == EOF) {
-      exit(EXIT_SUCCESS);
-    } else if (c == '\n') {
-      buffer[position] = '\0';
-      return buffer;
-    } else {
-      buffer[position] = c;
-    }
-    position++;
-
-    // If we have exceeded the buffer, reallocate.
-    if (position >= bufsize) {
-      bufsize += BUFFER_SIZE;
-      buffer = realloc(buffer, bufsize);
-      if (!buffer) {
-        fprintf(stderr, "lsh: allocation error\n");
-        exit(EXIT_FAILURE);
-      }
-    }
-  }
+  char *line = NULL;
+  ssize_t bufsize = 0; 
+  getline(&line, &bufsize, stdin); // Con la función getline se asigna un buffer
+  return line;
 }
 
 #define LSH_TOK_BUFSIZE 64
 #define LSH_TOK_DELIM " \t\r\n\a"
 
 /**
-   dividir una línea en tokens
+   dividir una línea en fragmentos en base a los espacios de línea 
  */
-char **split_line(char *line)
+char **separador(char *line)
 {
-  int bufsize = LSH_TOK_BUFSIZE, position = 0;
+  int bufsize = LSH_TOK_BUFSIZE, position = 0; //Buffer donde se guardan las palabras
   char **tokens = malloc(bufsize * sizeof(char*));
   char *token, **tokens_backup;
 
   if (!tokens) {
-    fprintf(stderr, "lsh: allocation error\n");
+    fprintf(stderr, "error de asiganción\n");
     exit(EXIT_FAILURE);
   }
 
@@ -211,7 +183,7 @@ char **split_line(char *line)
       tokens = realloc(tokens, bufsize * sizeof(char*));
       if (!tokens) {
 		free(tokens_backup);
-        fprintf(stderr, "lsh: allocation error\n");
+        fprintf(stderr, "error de asignación\n");
         exit(EXIT_FAILURE);
       }
     }
@@ -225,47 +197,40 @@ char **split_line(char *line)
 /**
    Lazo entre la entrada y la ejecución.
  */
-void loop(void)
+void shell(void)
 {
-  char *line;
+  char *linea;
   char **args;
-  int status;
-  //getcwd(PWD,max_amb); //Obtiene la ruta actual y la carga a PWD
-  strcpy(PATH,getenv("PATH"));
+  int estado;
+  
+  strcpy(PATH,getenv("PATH"));//Obtiene la ruta actual y la carga a PWD
   strcpy(SHELL,PWD);
   do {
-    getcwd(PWD,max_amb);
-    printf("OSRenzoLoorShell %s> ", PWD);
-    line = read_line();
-    args = split_line(line);
-    status = execute(args);
+    getcwd(PWD,max_amb); //Actualiza la ruta de trabajo
+    printf("OSRenzoLoorShell$ %s> ", PWD);
+    linea = leer_linea();
+    args = separador(linea);
+    estado = execute(args);
     
-    free(line);
+    free(linea);
     free(args);
-  } while (status);
+  } while (estado); //Se ejecuta una vez antes de verificar el estado
 }
 
-/**
-   @brief Main entry point.
-   @param argc Argument count.
-   @param argv Argument vector.
-   @return status code
- */
+
 int main(int argc, char **argv)
 {
-  // Load config files, if any.
+  // Carga la configuración
   clear();
   
-  printf("\n \n \n \t *******************************************************");
+  printf("\n \n \n*******************************************************");
   printf(" \n \t***miniShell**");
   printf("\n \n \t***Autor:    Renzo Loor***");
-  printf("\n \n \n \t*******************************************************");
+  printf("\n*******************************************************");
   sleep(2);
   clear();
-  // Run command loop.
-  loop();
-
-  // Perform any shutdown/cleanup.
+  
+  shell(); //ejecuta la función que simula el shell
 
   return EXIT_SUCCESS;
 }
